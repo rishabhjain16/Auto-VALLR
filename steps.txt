@@ -1,0 +1,9 @@
+python main.py \
+    --mode train \
+    --version V1 \
+    --videos_root /home/rishabhjain/Desktop/Datasets/lrs3_rf/lrs3 \
+    --save_model_path ./checkpoints/vallr_lrs3.pth \
+    --batch_size 8 \
+    --num_workers 4 \
+    --epochs 50 \
+    --sample_size 1.0
