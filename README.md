@@ -5,12 +5,42 @@ This guide provides step-by-step instructions for training VALLR on the Auto_AVS
 ---
 
 ## Table of Contents
+- [Setup](#setup)
 - [Overview](#overview)
 - [Architecture Modifications](#architecture-modifications)
 - [Dataset Preparation](#dataset-preparation)
 - [Training Strategy](#training-strategy)
 - [Inference](#inference)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Setup
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/rishabhjain16/Auto-VALLR.git
+cd Auto-VALLR
+```
+
+### 2. Create Conda Environment
+```bash
+# Create a new conda environment with Python 3.9 or 3.10
+conda create -n vallr python=3.10 -y
+conda activate vallr
+```
+
+### 3. Install Dependencies
+```bash
+# Install PyTorch (adjust CUDA version as needed)
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# Install other requirements
+pip install -r requirements.txt
+```
+
+### 4. Download Pre-trained Models (if needed)
+Place any pre-trained checkpoints in the `checkpoints/` directory.
 
 ---
 

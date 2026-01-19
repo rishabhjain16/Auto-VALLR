@@ -1,3 +1,4 @@
+#PART1
 python main.py \
     --mode train \
     --version V1 \
@@ -7,3 +8,7 @@ python main.py \
     --num_workers 4 \
     --epochs 50 \
     --sample_size 1.0
+
+
+#PART2
+python Models/Llama.py --epochs 10
