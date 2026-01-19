@@ -24,11 +24,11 @@ class AutoAVSRDataset(Dataset):
                  frame_size=(224, 224)):
         """
         Args: 
-            video_dir: Path to lrs3 root folder (contains lrs3_video_seg16s and lrs3_text_seg16s)
+            video_dir: Path to lrs3 video folder (e.g., . ../lrs_combined_video_seg16s/lrs3)
             split: "train", "val", or "test" (will map to trainval/test)
             phoneme_vocab:  Phoneme to index mapping
             num_frames: Number of frames to sample
-            frame_size:  (H, W) to resize frames
+            frame_size: (H, W) to resize frames
         """
         # Map split names to Auto_AVSR structure
         split_map = {
@@ -39,16 +39,19 @@ class AutoAVSRDataset(Dataset):
         avsr_split = split_map. get(split, split)
         
         self.video_root = Path(video_dir)
-        self.video_dir = self.video_root / "lrs3_video_seg16s" / avsr_split
-        self.text_dir = self.video_root / "lrs3_text_seg16s" / avsr_split
+        self.video_dir = self. video_root / avsr_split
+        
+        # Automatically derive text directory by replacing "video" with "text"
+        self.text_dir = Path(str(self.video_root).replace("video", "text")) / avsr_split
+        
         self.split = split
-        self.phoneme_vocab = phoneme_vocab
+        self. phoneme_vocab = phoneme_vocab
         self.num_frames = num_frames
-        self.frame_size = frame_size
+        self. frame_size = frame_size
         
         # Verify directories exist
         if not self.video_dir.exists():
-            raise ValueError(f"Video directory not found: {self.video_dir}")
+            raise ValueError(f"Video directory not found:  {self.video_dir}")
         if not self.text_dir.exists():
             raise ValueError(f"Text directory not found: {self.text_dir}")
         
@@ -68,11 +71,11 @@ class AutoAVSRDataset(Dataset):
         # Get all speaker ID folders
         speaker_dirs = sorted([d for d in self.video_dir. iterdir() if d.is_dir()])
         
-        for speaker_dir in speaker_dirs:
+        for speaker_dir in speaker_dirs: 
             speaker_id = speaker_dir.name
             text_speaker_dir = self.text_dir / speaker_id
             
-            if not text_speaker_dir.exists():
+            if not text_speaker_dir. exists():
                 continue
             
             # Get all . mp4 files
@@ -87,7 +90,7 @@ class AutoAVSRDataset(Dataset):
                     self.labels.append(str(text_file))
     
     def __len__(self):
-        return len(self.video_paths)
+        return len(self. video_paths)
     
     def __getitem__(self, idx):
         """Load video and convert text to phonemes"""
@@ -121,8 +124,8 @@ class AutoAVSRDataset(Dataset):
                 continue
             
             # Convert to tensors (same format as original VideoDataset)
-            video_tensor = torch.tensor(video).permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
-            phoneme_tensor = torch.tensor(phoneme_indices, dtype=torch.long)
+            video_tensor = torch. tensor(video).permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
+            phoneme_tensor = torch. tensor(phoneme_indices, dtype=torch.long)
             
             return video_tensor, phoneme_tensor
         
@@ -155,7 +158,7 @@ class AutoAVSRDataset(Dataset):
         if len(frames) < self.num_frames:
             return None
         
-        return np. array(frames)  # (T, H, W, C)
+        return np.array(frames)  # (T, H, W, C)
     
     def _load_text(self, text_path):
         """Load text from file"""
@@ -192,16 +195,16 @@ class AutoAVSRDataset(Dataset):
         # Remove punctuation
         word = re.sub(r'[^\w\s]', '', word).lower()
         
-        if not word: 
+        if not word:  
             return []
         
         phones = pronouncing.phones_for_word(word)
         
         if phones:
             # Take first pronunciation, remove stress markers
-            phoneme_list = [re.sub(r'\d+', '', p) for p in phones[0]. split()]
+            phoneme_list = [re.sub(r'\d+', '', p) for p in phones[0].split()]
             return phoneme_list
-        else:
+        else: 
             return []
 
 
@@ -211,12 +214,12 @@ def load_and_preprocess_video(video_path, num_frames):
     """
     try:
         vr = VideoReader(video_path, ctx=cpu(0), num_threads=4)
-    except Exception as e: 
-        print(f"Error loading video: {video_path}.  Error: {e}")
+    except Exception as e:  
+        print(f"Error loading video: {video_path}. Error: {e}")
         return None
 
     frame_count = len(vr)
-    if frame_count < num_frames:
+    if frame_count < num_frames: 
         return None
 
     sample_indices = np.linspace(0, frame_count - 1, num_frames).astype(int)
@@ -229,7 +232,7 @@ def load_and_preprocess_video(video_path, num_frames):
     if len(frames) < num_frames:
         return None
 
-    return np.array(frames)
+    return np. array(frames)
 
 
 def get_phonemes(sentence):
@@ -239,13 +242,13 @@ def get_phonemes(sentence):
     words = sentence.split()
     phoneme_list = []
     
-    for word in words:
+    for word in words: 
         word = re.sub(r'[^\w\s]', '', word).lower()
         if not word:
             continue
         
-        phones = pronouncing.phones_for_word(word)
+        phones = pronouncing. phones_for_word(word)
         if phones:
-            phoneme_list.extend([re.sub(r'\d+', '', p) for p in phones[0].split()])
+            phoneme_list.extend([re. sub(r'\d+', '', p) for p in phones[0].split()])
     
     return phoneme_list
