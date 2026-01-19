@@ -201,7 +201,7 @@ def main():
     parser.add_argument("--train-samples", type=int, default=None, help="Number of training samples (default: all)")
     parser.add_argument("--val-samples", type=int, default=None, help="Number of validation samples (default: all)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs (default: 10)")
-    parser.add_argument("--batch-size", type=int, default=1, help="Training batch size (default: 1)")
+    parser.add_argument("--batch-size", type=int, default=4, help="Training batch size (default: 1)")
     parser.add_argument("--output-dir", type=str, default="./checkpoints/llama_phonemes_to_text_lora", help="Output directory")
     parser.add_argument("--learning-rate", type=float, default=2e-4, help="Learning rate (default: 2e-4)")
     
