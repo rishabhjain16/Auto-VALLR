@@ -21,16 +21,21 @@ class AutoAVSRDataset(Dataset):
                  split="train",
                  phoneme_vocab=None,
                  num_frames=16,
-                 frame_size=(224, 224)):
+                 frame_size=(224, 224),
+                 train_val_split=0.9,  # 90% train, 10% val
+                 use_pretrain=True):  # Whether to include pretrain data in training
         """
         Args: 
             video_dir: Path to lrs3 video folder (e.g., . ../lrs_combined_video_seg16s/lrs3)
-            split: "train", "val", or "test" (will map to trainval/test)
+            split: "train", "val", or "test"
             phoneme_vocab:  Phoneme to index mapping
             num_frames: Number of frames to sample
             frame_size: (H, W) to resize frames
+            train_val_split: Fraction of trainval to use for training (rest is validation)
+            use_pretrain: If True, adds pretrain data to train split (153K+ videos)
         """
         # Map split names to Auto_AVSR structure
+        # Both train and val load from "trainval", then we split them
         split_map = {
             "train": "trainval",
             "val": "trainval",  
@@ -40,6 +45,8 @@ class AutoAVSRDataset(Dataset):
         
         self.video_root = Path(video_dir)
         self.video_dir = self. video_root / avsr_split
+        self.train_val_split = train_val_split
+        self.use_pretrain = use_pretrain and (split == "train")  # Only add pretrain to train
         
         # Automatically derive text directory by replacing "video" with "text"
         self.text_dir = Path(str(self.video_root).replace("video", "text")) / avsr_split
@@ -60,22 +67,51 @@ class AutoAVSRDataset(Dataset):
         self.labels = []
         self._build_dataset()
         
+        # Add pretrain data if requested (only for train split)
+        if self.use_pretrain:
+            print(f"Adding pretrain data to training set...")
+            pretrain_video_dir = self.video_root / "pretrain"
+            pretrain_text_dir = Path(str(self.video_root).replace("video", "text")) / "pretrain"
+            
+            if pretrain_video_dir.exists() and pretrain_text_dir.exists():
+                pretrain_count_before = len(self.video_paths)
+                self._build_dataset_from_dir(pretrain_video_dir, pretrain_text_dir)
+                pretrain_added = len(self.video_paths) - pretrain_count_before
+                print(f"✅ Added {pretrain_added} pretrain videos")
+        
+        # Apply train/val split if loading from trainval
+        if avsr_split == "trainval" and split in ["train", "val"]:
+            total_samples = len(self.video_paths)
+            split_idx = int(total_samples * self.train_val_split)
+            
+            if split == "train":
+                # Take first 90%
+                self.video_paths = self.video_paths[:split_idx]
+                self.labels = self.labels[:split_idx]
+            else:  # val
+                # Take last 10%
+                self.video_paths = self.video_paths[split_idx:]
+                self.labels = self.labels[split_idx:]
+        
         if len(self.video_paths) == 0:
             raise ValueError(f"No samples found in {split} split!")
         
         print(f"Loaded {len(self.video_paths)} videos from {split} split in {video_dir}.")
     
     def _build_dataset(self):
-        """Build list of video paths and labels"""
-        
+        """Build list of video paths and labels from current video_dir and text_dir"""
+        self._build_dataset_from_dir(self.video_dir, self.text_dir)
+    
+    def _build_dataset_from_dir(self, video_dir, text_dir):
+        """Build dataset from specified directories"""
         # Get all speaker ID folders
-        speaker_dirs = sorted([d for d in self.video_dir. iterdir() if d.is_dir()])
+        speaker_dirs = sorted([d for d in video_dir.iterdir() if d.is_dir()])
         
         for speaker_dir in speaker_dirs: 
             speaker_id = speaker_dir.name
-            text_speaker_dir = self.text_dir / speaker_id
+            text_speaker_dir = text_dir / speaker_id
             
-            if not text_speaker_dir. exists():
+            if not text_speaker_dir.exists():
                 continue
             
             # Get all . mp4 files
