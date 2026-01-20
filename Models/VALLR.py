@@ -14,25 +14,6 @@ class VALLR(nn.Module):
         videomae_feature_size = videomae_config.hidden_size  # Typically 768 for VideoMAE
 
         # Downsample the time dimension using multiple Conv1D and Pooling layers
-        self.downsampling = nn.Sequential(
-            nn.Conv1d(in_channels=videomae_feature_size, out_channels=adapter_dim, kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
-            nn.ReLU(),
-
-            nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
-            nn.ReLU(),
-
-            nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
-            nn.ReLU(),
-            
-            nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=3, padding=1),
-            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
-            nn.ReLU(),
-            nn.AvgPool1d(kernel_size=5, stride=8)  # Adjust kernel size and stride to control final length
-        )
-        # # Downsample the time dimension - LESS aggressive for longer sequences - To work with Auto_AVSR dataset format of 16 frames
         # self.downsampling = nn.Sequential(
         #     nn.Conv1d(in_channels=videomae_feature_size, out_channels=adapter_dim, kernel_size=5, stride=2, padding=2),
         #     nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
@@ -42,10 +23,29 @@ class VALLR(nn.Module):
         #     nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
         #     nn.ReLU(),
 
-        #     # Removed the extra stride=2 and stride=3 layers
-        #     # Removed the AvgPool stride=8
-        #     # Now:  1568 → 784 → 392 (instead of 1568 → ...  → 8)
+        #     nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=2, padding=1),
+        #     nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
+        #     nn.ReLU(),
+            
+        #     nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=3, padding=1),
+        #     nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
+        #     nn.ReLU(),
+        #     nn.AvgPool1d(kernel_size=5, stride=8)  # Adjust kernel size and stride to control final length
         # )
+        # Downsample the time dimension - LESS aggressive for longer sequences - To work with Auto_AVSR dataset format of 16 frames
+        self.downsampling = nn.Sequential(
+            nn.Conv1d(in_channels=videomae_feature_size, out_channels=adapter_dim, kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
+            nn.ReLU(),
+
+            nn.Conv1d(in_channels=adapter_dim, out_channels=adapter_dim, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm1d(adapter_dim, eps=1e-5, momentum=0.1, affine=True),
+            nn.ReLU(),
+
+            # Removed the extra stride=2 and stride=3 layers
+            # Removed the AvgPool stride=8
+            # Now:  1568 → 784 → 392 (instead of 1568 → ...  → 8)
+        )
 
         # Adapter: Adjust features from the downsampled time dimension to match Wav2Vec2 hidden size
         self.adapter = nn.Sequential(

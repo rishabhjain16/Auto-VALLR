@@ -54,6 +54,36 @@ def text_to_phoneme_line(text: str) -> str:
 
 TAGS = ["<S2S>", "<PHONEMES>", "</PHONEMES>", "<TEXT>"]
 
+def clean_text(text: str) -> str:
+    """
+    Clean Wikipedia markup from WikiText to make it more like natural speech.
+    """
+    if not text:
+        return ""
+    
+    # Remove Wikipedia section headers (= = = Title = = =)
+    text = re.sub(r'=+\s*([^=]+)\s*=+', r'\1', text)
+    
+    # Replace @-@ and @,@ with normal punctuation
+    text = re.sub(r'@\s*-\s*@', '-', text)
+    text = re.sub(r'@\s*,\s*@', ',', text)
+    text = re.sub(r'@\s*\.\s*@', '.', text)
+    
+    # Remove remaining @ symbols
+    text = re.sub(r'@', '', text)
+    
+    # Remove excessive punctuation and special characters
+    text = re.sub(r'[•★☆■□▪▫–—―]', '', text)
+    
+    # Normalize multiple spaces
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    
+    return text
+
+
 def build_example(text: str) -> Dict[str, str]:
     """
     Builds one training pair where the INPUT is phonemes and the TARGET is original text.
@@ -64,8 +94,24 @@ def build_example(text: str) -> Dict[str, str]:
     text = (text or "").strip()
     if not text:
         return None
+    
+    # Clean Wikipedia markup
+    text = clean_text(text)
+    if not text or len(text) < 5:
+        return None
+    
+    # Trim to reasonable length instead of skipping
+    # LRS3 is 4-23 words, so let's target 5-25 words
+    words = text.split()
+    if len(words) < 3:  # Too short, skip
+        return None
+    if len(words) > 25:  # Too long, trim to first 25 words
+        words = words[:25]
+        text = " ".join(words)
 
     phon_line = text_to_phoneme_line(text)
+    if not phon_line:
+        return None
 
     prompt = (
         f"{TAGS[0]}\n"

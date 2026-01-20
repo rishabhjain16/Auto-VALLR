@@ -157,22 +157,49 @@ def video_to_phonemes(video_path, model, device, phoneme_vocab):
 
 
 def load_part2_model(lora_path, device):
-    """Load Part 2 model (Phonemes → Text)."""
+    """
+    Load Part 2 model (Phonemes → Text).
+    Automatically detects if it's a LoRA adapter or merged model.
+    """
     print(f"Loading Part 2 model from {lora_path}...")
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(lora_path)
     
-    # Load base model
-    base_model_id = "meta-llama/Llama-3.2-3B-Instruct"
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model_id,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
-    model.resize_token_embeddings(len(tokenizer))
-    # Load LoRA adapters
-    model = PeftModel.from_pretrained(model, lora_path)
+    # Check if this is a merged model or LoRA adapter
+    adapter_config_path = Path(lora_path) / "adapter_config.json"
+    
+    # Check if "_merged" is in the path name - this is the clearest indicator
+    if "_merged" in str(lora_path):
+        # This is a merged model, load directly WITHOUT adapter loading
+        print("Loading merged model (no PEFT wrapper needed)...")
+        model = AutoModelForCausalLM.from_pretrained(
+            lora_path,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            trust_remote_code=True
+        )
+    elif adapter_config_path.exists():
+        # This is a LoRA adapter, load base + adapter
+        print("Loading LoRA adapter...")
+        base_model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model_id,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        model.resize_token_embeddings(len(tokenizer))
+        # Load LoRA adapters
+        model = PeftModel.from_pretrained(model, lora_path)
+    else:
+        # Fallback: assume it's a full model
+        print("Loading full model...")
+        model = AutoModelForCausalLM.from_pretrained(
+            lora_path,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+    
     model.to(device)
     model.eval()
     
@@ -181,42 +208,38 @@ def load_part2_model(lora_path, device):
 
 def text_to_phonemes(text):
     """
-    Convert text to phoneme sequence using g2p_en.  
+    Convert text to phoneme sequence using pronouncing library.
+    MATCHES THE TRAINING FORMAT with | separators between words.
     This simulates what Part 1 would output.
     """
     try:
-        from g2p_en import G2p
+        import pronouncing
+        import re
     except ImportError: 
-        print("Installing g2p_en...")
+        print("Installing pronouncing...")
         import subprocess
-        subprocess.check_call(["pip", "install", "g2p-en"])
-        from g2p_en import G2p
+        subprocess.check_call(["pip", "install", "pronouncing"])
+        import pronouncing
+        import re
     
-    # Download required NLTK data
-    try:
-        import nltk
-        nltk. data.find('taggers/averaged_perceptron_tagger_eng')
-    except LookupError:
-        print("Downloading required NLTK data...")
-        import nltk
-        nltk. download('averaged_perceptron_tagger_eng', quiet=True)
-        nltk.download('averaged_perceptron_tagger', quiet=True)
-        nltk.download('cmudict', quiet=True)
+    # Split into words
+    _WORD_RE = re.compile(r"[A-Za-z']+")
+    words = _WORD_RE.findall(text)
     
-    g2p = G2p()
-    phonemes = g2p(text)
+    arpawords = []
+    for w in words:
+        lw = w.lower()
+        phones = pronouncing.phones_for_word(lw)
+        if phones:
+            # Choose first pronunciation and strip stress markers (0,1,2)
+            arp = re.sub(r"\d", "", phones[0])
+            arpawords.append(arp)
+        else:
+            # Fallback for unknown words
+            arpawords.append(f"UNK({lw})")
     
-    # Clean up phonemes (remove numbers/stress markers and spaces)
-    cleaned = []
-    for p in phonemes: 
-        p = p.strip()
-        # Remove any digits (stress markers)
-        p_clean = ''.join([c for c in p if not c.isdigit()])
-        # Only add non-empty, non-space phonemes
-        if p_clean and p_clean not in [' ', '']: 
-            cleaned.append(p_clean.upper())
-    
-    return ' '.join(cleaned)
+    # Join with spaces (MATCHING TRAINING FORMAT - no | separator used in training!)
+    return " ".join(arpawords)
 
 def test_part2_only(text, part2_model_path, device):
     """Test Part 2 model with text input (converts to phonemes first)."""
@@ -267,7 +290,7 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=10
     # Tokenize
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     
-    # Generate
+    # Generate with improved parameters to prevent repetition
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
@@ -275,7 +298,9 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=10
             temperature=0.7,
             do_sample=True,
             top_p=0.9,
-            pad_token_id=tokenizer. eos_token_id
+            repetition_penalty=1.2,  # ADDED: Prevents repetitive output
+            no_repeat_ngram_size=3,   # ADDED: No repeating 3-grams
+            pad_token_id=tokenizer.eos_token_id
         )
     
     # Decode
@@ -286,7 +311,7 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=10
         generated_text = full_output.split("<TEXT>")[-1].strip()
         # Remove any trailing special tokens
         for tag in ["</S2S>", tokenizer.eos_token]:  
-            if generated_text. endswith(tag):
+            if generated_text.endswith(tag):
                 generated_text = generated_text[:-len(tag)].strip()
     else:
         generated_text = full_output
