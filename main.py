@@ -467,12 +467,14 @@ def load_videos(video_path, num_frames=16, frame_size=(224, 224)):
     try:
         vr = VideoReader(video_path, ctx=cpu(0), num_threads=4)
     except Exception as e:
-        print(f"Error loading video: {video_path}. Error: {e}")
+        # Uncomment for debugging video loading issues
+        # print(f"Error loading video: {video_path}. Error: {e}")
         return None
 
     frame_count = len(vr)
     if frame_count < num_frames:
-        print(f"Warning: Not enough frames in video {video_path}. Skipping.")
+        # Silently skip - this is common in LRS3 pretrain, retry logic will handle it
+        # Uncomment for debugging: print(f"Warning: Not enough frames in video {video_path}. Skipping.")
         return None
 
     # Sample indices for the frames evenly spaced across the video
