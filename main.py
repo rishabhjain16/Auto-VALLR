@@ -118,6 +118,9 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, phoneme_voc
         if videos.size(0) == 0:  # Check if the batch is empty
             print("Skipping empty batch")
             continue
+        
+        # DEBUG: Check actual batch size
+        print(f"DEBUG - Batch shape: {videos.shape}, Actual batch size: {videos.size(0)}")
 
         labels = [label.to(device) for label in labels]
         videos = videos.to(device)
@@ -207,7 +210,8 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, phoneme_voc
     avg_loss = running_loss / len(dataloader)
     accuracy = (total_correct / total_samples) * 100 if total_samples > 0 else 0.0
 
-    torch.cuda.empty_cache()  # Clear CUDA memory
+    # Don't clear cache during training - PyTorch's memory caching improves performance
+    # torch.cuda.empty_cache()
 
     return avg_loss, accuracy
 
@@ -293,7 +297,8 @@ def validate_one_epoch(model, dataloader, criterion, device, phoneme_vocab):
     avg_loss = running_loss / len(dataloader)
     accuracy = (total_correct / total_samples) * 100 if total_samples > 0 else 0.0
 
-    torch.cuda.empty_cache()  # Clear CUDA memory
+    # Don't clear cache during validation - PyTorch's memory caching improves performance
+    # torch.cuda.empty_cache()
 
     return avg_loss, accuracy
 
@@ -306,7 +311,9 @@ def save_model(model, save_model_path):
 def train(device, version, video_path, batch_size, num_workers, epochs, save_model_path, sample_size, vocab):
     """Main training function."""
 
-    torch.cuda.empty_cache()  # Clear CUDA memory
+    # Only clear cache at start of training to free up any leftover memory
+    # Don't clear during training - it hurts performance
+    torch.cuda.empty_cache()
 
     # Extract the pretrained vocabulary
     phoneme_vocab = vocab # tokenizer.get_vocab()

@@ -56,30 +56,66 @@ TAGS = ["<S2S>", "<PHONEMES>", "</PHONEMES>", "<TEXT>"]
 
 def clean_text(text: str) -> str:
     """
-    Clean Wikipedia markup from WikiText to make it more like natural speech.
+    Clean Wikipedia markup and convert to LRS3 style:
+    - All uppercase
+    - Only letters, spaces, and apostrophes
+    - No punctuation, numbers, or special characters
     """
     if not text:
         return ""
     
+    # Remove URLs and email patterns
+    text = re.sub(r'http[s]?://\S+', '', text)
+    text = re.sub(r'www\.\S+', '', text)
+    text = re.sub(r'\S+@\S+\.\S+', '', text)
+    text = re.sub(r'\S+\.(com|net|org|edu|gov|io|co)\S*', '', text)
+    
     # Remove Wikipedia section headers (= = = Title = = =)
     text = re.sub(r'=+\s*([^=]+)\s*=+', r'\1', text)
     
-    # Replace @-@ and @,@ with normal punctuation
-    text = re.sub(r'@\s*-\s*@', '-', text)
-    text = re.sub(r'@\s*,\s*@', ',', text)
-    text = re.sub(r'@\s*\.\s*@', '.', text)
+    # Remove ALL brackets and parentheses with content
+    text = re.sub(r'\[[^\]]*\]', '', text)
+    text = re.sub(r'\{[^\}]*\}', '', text)
+    text = re.sub(r'\([^)]*\)', '', text)
     
-    # Remove remaining @ symbols
+    # Remove time stamps and numbers with colons
+    text = re.sub(r'\d{1,2}\s*:\s*\d{2}', '', text)
+    
+    # Remove standalone years and all numbers
+    text = re.sub(r'\b\d+\b', '', text)
+    
+    # Remove markdown/wiki formatting
+    text = re.sub(r'[*#_]{2,}([^*#_]+)[*#_]{2,}', r'\1', text)
+    text = re.sub(r'[*#_]([^*#_]+)[*#_]', r'\1', text)
+    text = re.sub(r'[*#_]+', '', text)
+    
+    # Replace @-@ with spaces (not hyphens)
+    text = re.sub(r'@\s*[-–—]\s*@', ' ', text)
     text = re.sub(r'@', '', text)
     
-    # Remove excessive punctuation and special characters
-    text = re.sub(r'[•★☆■□▪▫–—―]', '', text)
+    # Remove ALL punctuation except apostrophes (keep contractions like don't, I'm)
+    # Remove: . , ! ? ; : - — – _ / \ | ~ ` " etc.
+    text = re.sub(r'[^\w\s\']', ' ', text)  # Keep only word chars, spaces, apostrophes
+    
+    # Remove standalone punctuation
+    text = re.sub(r'\s+[^\w\s]\s+', ' ', text)
     
     # Normalize multiple spaces
     text = re.sub(r'\s+', ' ', text)
     
+    # Convert to UPPERCASE (LRS3 style)
+    text = text.upper()
+    
     # Remove leading/trailing whitespace
     text = text.strip()
+    
+    # Final checks
+    if len(text) < 3:
+        return ""
+    
+    # Skip if still has weird characters (after uppercasing, only A-Z, space, apostrophe allowed)
+    if not all(c.isalpha() or c.isspace() or c == "'" for c in text):
+        return ""
     
     return text
 
@@ -311,7 +347,7 @@ def main():
     lora_cfg = LoraConfig(
         r=16,
         lora_alpha=32,
-        lora_dropout=0.05,
+        lora_dropout=0.1,  # Increased from 0.05 to prevent overfitting
         bias="none",
         task_type=TaskType.CAUSAL_LM,
         target_modules=[
@@ -330,14 +366,17 @@ def main():
         output_dir=args.output_dir if not args.test else "./checkpoints/Llama_lora_training",
         overwrite_output_dir=True,
         evaluation_strategy="epoch",
+        save_strategy="epoch",
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         num_train_epochs=epochs,
         learning_rate=args.learning_rate,
-        weight_decay=0.01,
+        weight_decay=0.05,  # Increased from 0.01 to prevent overfitting
         logging_dir='./logs',
         logging_steps=10,
-        save_total_limit=2,
+        save_total_limit=3,  # Keep more checkpoints to select best
+        load_best_model_at_end=True,  # Load best checkpoint at end
+        metric_for_best_model="eval_loss",  # Use eval_loss to select best
         fp16=True,
         gradient_accumulation_steps=4,
         warmup_ratio=0.03,
