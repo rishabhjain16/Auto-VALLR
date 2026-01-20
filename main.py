@@ -119,8 +119,8 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, phoneme_voc
             print("Skipping empty batch")
             continue
         
-        # DEBUG: Check actual batch size
-        print(f"DEBUG - Batch shape: {videos.shape}, Actual batch size: {videos.size(0)}")
+        # DEBUG: Check actual batch size (uncomment if needed)
+        # print(f"DEBUG - Batch shape: {videos.shape}, Actual batch size: {videos.size(0)}")
 
         labels = [label.to(device) for label in labels]
         videos = videos.to(device)
@@ -143,9 +143,8 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device, phoneme_voc
                 max_len = target_lengths.max().item()
                 max_idx = torch.argmax(target_lengths).item()
                 # print(f"⚠️ Skipping batch: input lengths {input_lengths.min().item()} < target length {max_len}")
-                print(f"Longest target length index: {max_idx}")
-                print(f"Target tensor (longest): {labels[max_idx].tolist()}")
-                # quit()
+                # print(f"Longest target length index: {max_idx}")
+                # print(f"Target tensor (longest): {labels[max_idx].tolist()}")
                 continue  # Skip the batch if the input lengths are too short
 
             loss = criterion(transpose_logits, torch.cat(labels), input_lengths, target_lengths)

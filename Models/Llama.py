@@ -280,6 +280,11 @@ def main():
     
     parser = argparse.ArgumentParser(description="Train LLaMA for Phoneme-to-Text")
     parser.add_argument("--test", action="store_true", help="Run in test mode with small subset")
+    parser.add_argument("--dataset", type=str, default="wikitext", choices=["wikitext", "lrs3"],
+                       help="Dataset to use: 'wikitext' (default) or 'lrs3'")
+    parser.add_argument("--lrs3-text-dir", type=str, 
+                       default="/home/rishabhjain/Desktop/Datasets/lrs3_rf/lrs3/lrs3_text_seg16s",
+                       help="Path to LRS3 text directory (only used if --dataset=lrs3)")
     parser.add_argument("--train-samples", type=int, default=None, help="Number of training samples (default: all)")
     parser.add_argument("--val-samples", type=int, default=None, help="Number of validation samples (default: all)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs (default: 10)")
@@ -290,9 +295,20 @@ def main():
     args = parser.parse_args()
     
     # 1) Load dataset
-    print("Loading WikiText-2 dataset...")
-    train_ds = prepare_split("train")
-    val_ds = prepare_split("validation")
+    if args.dataset == "lrs3":
+        print("Loading LRS3 dataset (trainval + pretrain, excluding test)...")
+        from Data.Llama_lrs3_dataset import prepare_lrs3_dataset
+        
+        max_samples = 100 if args.test else None
+        train_ds, val_ds = prepare_lrs3_dataset(
+            args.lrs3_text_dir,
+            max_samples=max_samples,
+            exclude_test=True  # Never include test in training
+        )
+    else:  # wikitext
+        print("Loading WikiText-2 dataset...")
+        train_ds = prepare_split("train")
+        val_ds = prepare_split("validation")
     
     # Apply test mode or custom sample sizes
     if args.test:
