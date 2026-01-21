@@ -264,7 +264,7 @@ def test_part2_only(text, part2_model_path, device):
     
     return generated_text
 
-def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=100):
+def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=50):
     """
     Part 2: Phonemes → Text
     
@@ -273,7 +273,7 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=10
         model: Part 2 model
         tokenizer:  Tokenizer
         device: torch device
-        max_new_tokens (int): Max tokens to generate
+        max_new_tokens (int): Max tokens to generate as safety limit
     
     Returns:  
         generated_text (str): The predicted text
@@ -290,17 +290,14 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=10
     # Tokenize
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     
-    # Generate with improved parameters to prevent repetition
+    # Generate with simple greedy decoding - let model decide when to stop
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
-            temperature=0.7,
-            do_sample=True,
-            top_p=0.9,
-            repetition_penalty=1.2,  # ADDED: Prevents repetitive output
-            no_repeat_ngram_size=3,   # ADDED: No repeating 3-grams
-            pad_token_id=tokenizer.eos_token_id
+            do_sample=False,  # Greedy decoding
+            eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
         )
     
     # Decode

@@ -1,5 +1,9 @@
 import re
 import torch
+import os
+import sys
+import csv
+from pathlib import Path
 from typing import List, Dict
 from datasets import load_dataset
 from transformers import (
@@ -8,10 +12,14 @@ from transformers import (
     Trainer,
     TrainingArguments,
     DataCollatorWithPadding,
+    TrainerCallback,
 )
 from peft import LoraConfig, get_peft_model, TaskType
 
 import pronouncing  # CMUdict-based
+
+# Add parent directory to path for Data module imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # ---------- Phoneme utilities (ARPAbet via pronouncing) ----------
 
@@ -251,6 +259,46 @@ def debug_supervision(ds, name):
 
 # ---------- Custom collator (keep labels, just pad if needed) ----------
 
+# ---------- Custom collator (keep labels, just pad if needed) ----------
+
+class MetricsLoggerCallback(TrainerCallback):
+    """
+    Custom callback to log training metrics to a CSV file.
+    Logs: epoch, step, train_loss, eval_loss, learning_rate
+    """
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_dir = Path(log_file).parent
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize CSV file with headers
+        with open(self.log_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['epoch', 'step', 'train_loss', 'eval_loss', 'learning_rate', 'timestamp'])
+        
+        print(f"📊 Logging metrics to: {self.log_file}")
+    
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        """Called when logging happens (every logging_steps)."""
+        if logs is None:
+            return
+        
+        # Get current values
+        epoch = logs.get('epoch', state.epoch)
+        step = state.global_step
+        train_loss = logs.get('loss', '')
+        eval_loss = logs.get('eval_loss', '')
+        lr = logs.get('learning_rate', '')
+        
+        # Get timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Write to CSV
+        with open(self.log_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, step, train_loss, eval_loss, lr, timestamp])
+
 class CausalLMDataCollator(DataCollatorWithPadding):
     """
     Uses tokenizer padding for inputs. Expects 'labels' already provided;
@@ -404,6 +452,10 @@ def main():
     debug_supervision(tokenized_train, "train")
     debug_supervision(tokenized_val, "val")
 
+    # Create metrics logger callback
+    log_file = Path(args.output_dir) / "training_log.csv"
+    metrics_logger = MetricsLoggerCallback(log_file)
+
     # 6) Train
     print("Setting up Trainer...")
     trainer = Trainer(
@@ -413,6 +465,7 @@ def main():
         eval_dataset=tokenized_val,
         data_collator=collator,
         tokenizer=tokenizer,
+        callbacks=[metrics_logger],
     )
 
     print("Starting training...")
