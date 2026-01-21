@@ -1,6 +1,7 @@
 # VALLR Training Guide with Auto_AVSR Dataset
 
-This guide provides step-by-step instructions for training VALLR on the Auto_AVSR (LRS3) dataset for continuous speech lip-reading. This repo was foked from the VALLR repo and is currently under development. 
+This guide provides step-by-step instructions for training VALLR on the Auto_AVSR (LRS3) dataset for continuous speech lip-reading. 
+**This repo was foked from the VALLR repo and is currently under development.**
 
 Note: The VALLR paper is quite interesting, however, I found many missing components in their Github codebase, so I decided to improve on it and make my own version of it as per my usecase. I also use Auto-AVSR based data cleaning to work with full sentences rather than the wod-level segmentation they do. At least, that's the plan.
 
