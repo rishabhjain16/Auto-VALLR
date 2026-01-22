@@ -143,12 +143,26 @@ def video_to_phonemes(video_path, model, device, phoneme_vocab):
     
     # Run inference
     with torch.no_grad():
-        video_tensor = video_tensor. to(device)
+        video_tensor = video_tensor.to(device)
         logits, _ = model(video_tensor)  # (batch, time, vocab_size)
+    
+    # Debug: Print logits info
+    print(f"Logits shape: {logits.shape}")
+    print(f"Logits min: {logits.min():.4f}, max: {logits.max():.4f}, mean: {logits.mean():.4f}")
+    
+    # Get predictions before CTC decoding
+    predictions = torch.argmax(logits, dim=-1)
+    print(f"Raw predictions (before CTC): {predictions[0][:50].cpu().tolist()}")  # First 50 predictions
+    
+    # Count unique predictions
+    unique_preds = torch.unique(predictions[0])
+    print(f"Unique predicted indices: {unique_preds.cpu().tolist()}")
     
     # CTC decode
     decoded = ctc_decode(logits, phoneme_vocab, blank_id=0)
     phonemes = decoded[0]  # First (and only) sequence in batch
+    
+    print(f"Decoded phonemes: {phonemes}")
     
     # Join into string
     phoneme_string = " ".join(phonemes)

@@ -336,11 +336,15 @@ def train(device, version, video_path, batch_size, num_workers, epochs, save_mod
     print(f"Model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters.")
 
     criterion = nn.CTCLoss(blank=phoneme_vocab['<pad>'], reduction="mean", zero_infinity=True)
-    lr = 1e-6  # initial learning rate
-    target_lr = 1e-4  # final learning rate after warm-up
-    warmup_steps = 500  # define your warmup steps
+    
+    # FIXED LEARNING RATE SCHEDULE
+    # Previous: lr=1e-6 → 1e-4 was too low, model collapsed to predicting only blanks
+    # New: Start higher to make actual progress
+    lr = 5e-5  # Initial learning rate (50x higher than before!)
+    target_lr = 3e-4  # Final learning rate after warm-up (3x higher)
+    warmup_steps = 1000  # Longer warmup (2x longer, ~14% of first epoch)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)  # Added weight decay for regularization
     after_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
     # Set up warm-up scheduler
