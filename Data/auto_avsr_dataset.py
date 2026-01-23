@@ -177,7 +177,7 @@ class AutoAVSRDataset(Dataset):
         
         frame_count = len(vr)
         if frame_count < self.num_frames:
-            print(f"Warning: Not enough frames in video {video_path}. Skipping.")
+            # Silently skip short videos (~1% of LRS3 dataset)
             return None
         
         # Sample indices uniformly

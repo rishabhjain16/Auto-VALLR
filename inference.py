@@ -9,6 +9,7 @@ import argparse
 import numpy as np
 import os
 import json
+import re
 from pathlib import Path
 from tqdm import tqdm
 from transformers import (
@@ -249,8 +250,10 @@ def text_to_phonemes(text):
             arp = re.sub(r"\d", "", phones[0])
             arpawords.append(arp)
         else:
-            # Fallback for unknown words
-            arpawords.append(f"UNK({lw})")
+            # Skip unknown words instead of adding UNK (model wasn't trained on UNK)
+            # This matches what happens when Part 1 can't recognize a word
+            print(f"Warning: Unknown word '{lw}' - skipping")
+            continue
     
     # Join with spaces (MATCHING TRAINING FORMAT - no | separator used in training!)
     return " ".join(arpawords)
@@ -292,26 +295,30 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=50
     Returns:  
         generated_text (str): The predicted text
     """
-    # Format prompt (matching training format)
+    # Format prompt (matching training format from Llama_lrs3_dataset.py)
     prompt = (
-        "<S2S>\n"
         "<PHONEMES>\n"
+        "<PHONEME_SEQUENCE>\n"
         f"{phoneme_string}\n"
-        "</PHONEMES>\n"
+        "</PHONEME_SEQUENCE>\n"
         "<TEXT>\n"
     )
     
     # Tokenize
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     
-    # Generate with simple greedy decoding - let model decide when to stop
+    # Generate with simple greedy decoding
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=max_new_tokens,
+            max_new_tokens=20,  # Very conservative - LRS3 averages 8-12 words
+            min_new_tokens=2,   # Require at least some output
             do_sample=False,  # Greedy decoding
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.eos_token_id,
+            repetition_penalty=2.0,  # Strong anti-repetition
+            no_repeat_ngram_size=4,  # Prevent repeating 4-grams
+            num_beams=1,  # Greedy search
         )
     
     # Decode
@@ -320,10 +327,18 @@ def phonemes_to_text(phoneme_string, model, tokenizer, device, max_new_tokens=50
     # Extract only the generated text (after <TEXT>)
     if "<TEXT>" in full_output:  
         generated_text = full_output.split("<TEXT>")[-1].strip()
+        
         # Remove any trailing special tokens
-        for tag in ["</S2S>", tokenizer.eos_token]:  
+        if tokenizer.eos_token and tokenizer.eos_token in generated_text:
+            generated_text = generated_text.split(tokenizer.eos_token)[0].strip()
+        
+        for tag in ["</S2S>"]:  
             if generated_text.endswith(tag):
                 generated_text = generated_text[:-len(tag)].strip()
+        
+        # Stop at newline
+        if "\n" in generated_text:
+            generated_text = generated_text.split("\n")[0].strip()
     else:
         generated_text = full_output
     

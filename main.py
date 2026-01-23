@@ -457,11 +457,11 @@ def train(device, version, video_path, batch_size, num_workers, epochs, save_mod
 
         # Log all metrics for the epoch
         current_lr = scheduler.get_last_lr()[0]
-        # current_lr = after_scheduler.get_last_lr()[0]
         log_all_metrics(epoch+1, epochs, epoch_train_loss, epoch_train_acc, epoch_val_loss, epoch_val_acc, current_lr)
+        
         # Step the scheduler with the validation loss
         scheduler.step(epoch_val_loss)
-        # after_scheduler.step(epoch_val_loss)
+        
         save_model(model, save_model_path)
 
     # Finish Wandb run and save the model

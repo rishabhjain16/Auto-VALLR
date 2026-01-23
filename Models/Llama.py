@@ -200,9 +200,12 @@ def make_tokenize_fn(tokenizer, max_length: int = 512, min_target_tokens: int = 
         input_ids_batch, attn_batch, labels_batch = [], [], []
 
         for prompt, target in zip(batch["prompt"], batch["target"]):
-            # Encode WITHOUT adding extra special tokens
+            # Encode WITHOUT adding extra special tokens for prompt
             p = tokenizer(prompt, add_special_tokens=False)["input_ids"]
+            # Encode target WITH eos token so model learns to stop
             t = tokenizer(target, add_special_tokens=False)["input_ids"]
+            # Add EOS token after target
+            t = t + [tokenizer.eos_token_id]
 
             # Skip pathological cases
             if len(t) == 0:
