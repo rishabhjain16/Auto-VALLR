@@ -3,8 +3,9 @@
 This guide provides step-by-step instructions for training VALLR on the Auto_AVSR (LRS3) dataset for continuous speech lip-reading. 
 **This repo was foked from the VALLR repo and is currently under development.**
 
-Note: The VALLR paper is quite interesting, however, I found many missing components in their Github codebase, so I decided to improve on it and make my own version of it as per my usecase. I also use Auto-AVSR based data cleaning to work with full sentences rather than the wod-level segmentation they do. At least, that's the plan.
+Note: The VALLR paper is quite interesting, however, I found many missing components in their Github codebase, so I decided to improve on it and make my own version of it as per my usecase. I also use Auto-AVSR based data cleaning to work with full sentences rather than the word-level segmentation they do. At least, that's the plan.
 
+Update: I tried a few training, however its hard to get CTC alignment to converge at sentence-level. In the original Vall-R Codebase, authors use word-level predictions with CTC which seemsed to have worked for them as per the reported results. However, in this codebase, I am finding it difficult to converge it for sentence-level. I have not tried to make it work at work-level since I am adapting the Auto-AVSR data processing pipeline to work with my datasets. I am open to ideas. 
 ---
 
 ## Table of Contents
@@ -260,11 +261,6 @@ python inference.py \
     --part1-only
 ```
 
-**Output:**
-```
-Predicted phonemes: DH AH K AE T IH Z S IH T IH NG
-```
-
 #### Video → Text (Full Pipeline)
 
 ```bash
@@ -274,13 +270,6 @@ python inference.py \
     --part2-model ./llama_phonemes_to_text_lora
 ```
 
-**Output:**
-```
-Predicted phonemes: DH AH K AE T IH Z S IH T IH NG
-Predicted text: THE CAT IS SITTING
-Ground truth: THE CAT IS SITTING
-WER: 0.00%
-```
 
 ---
 
@@ -444,27 +433,7 @@ python inference.py \
     --video test.mp4 \
     --part1-model ./checkpoints/vallr_part1.pth \
     --part2-model ./llama_phonemes_to_](#)
-
 
-## File Structure After Training
-
-```
-VALLR/
-├── checkpoints/
-│   ├── vallr_part1.pth                    # Part 1 model (Video → Phonemes)
-│   └── test_model.pth                     # Test runs
-├── llama_phonemes_to_text_lora/          # Part 2 LoRA adapters
-│   ├── adapter_config.json
-│   ├── adapter_model.bin
-│   └── tokenizer files... 
-├── llama_phonemes_to_text_lora_merged/   # Part 2 full model
-│   └── pytorch_model.bin
-├── inference. py                           # Inference script
-├── test_results.json                      # Evaluation results with WER
-├── wandb/                                 # Training logs
-│   └── offline-run-*/
-└── logs/                                  # Additional logs
-```
 
 ---
 
